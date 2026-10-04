@@ -1,0 +1,8 @@
+{
+  "name": "صلوات يسوع والصلوات السهمية | Jesus Prayer App",
+  "description": "تطبيق صلوات يسوع والصلوات السهمية والخلوة الروحية والطلبات الشخصية مع مسبحة إلكترونية ومؤقت خلوة.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
