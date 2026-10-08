@@ -1,5 +1,7 @@
 export type PrayerCategory = 'arrow' | 'repentance' | 'blessing' | 'personal';
 
+export type PrayerSourceType = 'verse' | 'patristic' | 'prayer';
+
 export interface PrayerItem {
   id: string;
   category: PrayerCategory;
@@ -7,6 +9,9 @@ export interface PrayerItem {
   textEn: string;
   referenceAr?: string;
   referenceEn?: string;
+  sourceType?: PrayerSourceType; // 'verse' for bible verse, 'patristic' for church fathers, 'prayer' for arrow/liturgical
+  fatherNameAr?: string; // e.g. "يوحنا ذهبي الفم", "متى المسكين", "أنطونيوس الكبير"
+  fatherNameEn?: string; // e.g. "St. John Chrysostom", "Father Matta El Meskeen", "St. Anthony"
   isCustom?: boolean;
 }
 

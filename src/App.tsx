@@ -200,6 +200,9 @@ export default function App() {
   };
 
   const handleChangePrayerRandom = () => {
+    // Reset the counter automatically when changing the prayer
+    setCount(0);
+
     if (activePrayers.length > 1) {
       setCurrentPrayerIndex((prev) => {
         let next = Math.floor(Math.random() * activePrayers.length);
@@ -211,12 +214,17 @@ export default function App() {
     } else {
       setCurrentPrayerIndex(0);
     }
-    spiritualHaptics.triggerPrayerSwitchFeedback(settings.hapticFeedback);
+    // Make the sound of the prayer change button the same as the counter button
+    spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
   };
 
   const handleNextPrayerSequential = () => {
+    // Reset the counter automatically when changing the prayer
+    setCount(0);
+
     setCurrentPrayerIndex((prev) => (prev + 1) % activePrayers.length);
-    spiritualHaptics.triggerPrayerSwitchFeedback(settings.hapticFeedback);
+    // Make the sound the same as the counter button
+    spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
   };
 
   const handleToggleFavorite = () => {
@@ -232,9 +240,12 @@ export default function App() {
   };
 
   const handleSelectCategory = (cat: PrayerCategory) => {
+    // Reset the counter automatically when changing category
+    setCount(0);
     setSelectedCategory(cat);
     setCurrentPrayerIndex(0);
     setIsCategoryDropdownOpen(false);
+    spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
   };
 
   const handleAddPersonalPrayer = (text: string) => {
@@ -302,12 +313,14 @@ export default function App() {
     const ref = isEn ? currentPrayer.referenceEn : currentPrayer.referenceAr;
 
     try {
-      const dataUrl = await generatePrayerCardImage(
-        prayerText,
-        catLabel,
-        ref,
-        settings.fontFamily
-      );
+      const dataUrl = await generatePrayerCardImage({
+        text: prayerText,
+        categoryLabel: catLabel,
+        reference: ref,
+        fontFamily: settings.fontFamily,
+        prayer: currentPrayer,
+        language: settings.language
+      });
       setShareImageUrl(dataUrl);
     } catch (e) {
       console.error('Failed to generate prayer card image', e);
@@ -564,9 +577,11 @@ export default function App() {
         onClose={() => setIsFavoritesOpen(false)}
         favorites={favoritePrayers}
         onSelectPrayer={(p) => {
+          setCount(0); // Reset counter automatically when changing prayer
           setSelectedCategory(p.category);
           const index = prayers.findIndex((item) => item.id === p.id);
           if (index !== -1) setCurrentPrayerIndex(index);
+          spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
         }}
         onRemoveFavorite={(id) => setFavoriteIds((prev) => prev.filter((fId) => fId !== id))}
         language={settings.language}

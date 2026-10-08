@@ -29,7 +29,17 @@ export const PrayerCardDisplay: React.FC<PrayerCardDisplayProps> = ({
   if (!prayer) return null;
 
   const prayerText = isEn ? prayer.textEn : prayer.textAr;
-  const prayerRef = isEn ? prayer.referenceEn : prayer.referenceAr;
+  
+  // Format reference tag
+  let displayReference = isEn ? prayer.referenceEn : prayer.referenceAr;
+  if (prayer.sourceType === 'patristic' && prayer.fatherNameAr) {
+    if (isEn) {
+      displayReference = `Sayings of Father ${prayer.fatherNameEn || prayer.fatherNameAr}`;
+    } else {
+      const cleanFather = prayer.fatherNameAr.replace(/^أقوال\s+/, '').replace(/^الأب\s+/, '').trim();
+      displayReference = `أقوال الأب ${cleanFather}`;
+    }
+  }
 
   // Font size classes
   const sizeClasses = {
@@ -51,7 +61,6 @@ export const PrayerCardDisplay: React.FC<PrayerCardDisplayProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -83,9 +92,9 @@ export const PrayerCardDisplay: React.FC<PrayerCardDisplayProps> = ({
           <Heart className={`w-5 h-5 transition-transform ${isFavorite ? 'fill-current scale-110' : ''}`} />
         </button>
 
-        {prayerRef && (
+        {displayReference && (
           <span className="text-[11px] font-cairo px-3 py-1 rounded-full bg-slate-800/80 text-amber-300/90 border border-slate-700/60 font-medium">
-            {prayerRef}
+            {displayReference}
           </span>
         )}
       </div>
@@ -100,42 +109,45 @@ export const PrayerCardDisplay: React.FC<PrayerCardDisplayProps> = ({
         </p>
       </div>
 
-      {/* Bottom Actions Row: Share as Image & Copy Text */}
-      <div className="mt-2 pt-3.5 border-t border-slate-800/80 flex items-center justify-between relative z-10 text-xs">
-        <div className="flex items-center gap-2">
-          {/* Share as Image (مشاركة كصورة) */}
-          <button
-            type="button"
-            onClick={onShareImage}
-            className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-amber-300 bg-slate-900/70 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-amber-500/40 transition-all active:scale-95 cursor-pointer shadow-sm"
-          >
-            <Palette className="w-3.5 h-3.5 text-amber-400" />
-            <span className="font-cairo">{isEn ? 'Share Image' : 'مشاركة كصورة'}</span>
-          </button>
+      {/* 
+        Bottom Actions Row:
+        - "الزرار مشاركه الصلاة كصورة خليه في اقصى اليمين وزرار نسخ الصوره نسخ الصلاه يكون في اقصى الشمال"
+        - "وزرار النسخ يكون مكتوب جنبه كلمه نسخ الصلاه"
+        Using dir="ltr" with justify-between guarantees:
+        Left child (0% X) = Copy Prayer Button with label "نسخ الصلاة"
+        Right child (100% X) = Share as Image Button on the far right
+      */}
+      <div 
+        className="mt-2 pt-3.5 border-t border-slate-800/80 flex items-center justify-between w-full relative z-10 text-xs" 
+        dir="ltr"
+      >
+        {/* FAR LEFT (أقصى الشمال): زر نسخ الصلاة ومكتوب جنبه كلمة نسخ الصلاة */}
+        <button
+          type="button"
+          onClick={handleCopyText}
+          className="flex items-center gap-1.5 text-xs font-semibold text-sky-300 hover:text-amber-300 bg-slate-900/70 hover:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-800 hover:border-sky-500/40 transition-all active:scale-95 cursor-pointer shadow-sm select-none"
+          title={copied ? (isEn ? 'Copied!' : 'تم النسخ!') : (isEn ? 'Copy Prayer' : 'نسخ الصلاة')}
+        >
+          {copied ? (
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+          ) : (
+            <Copy className="w-3.5 h-3.5 text-sky-400" />
+          )}
+          <span className="font-cairo">
+            {copied ? (isEn ? 'Copied' : 'تم النسخ') : (isEn ? 'Copy Prayer' : 'نسخ الصلاة')}
+          </span>
+        </button>
 
-          {/* Copy Text (نسخ النص) */}
-          <button
-            type="button"
-            onClick={handleCopyText}
-            className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-amber-300 bg-slate-900/70 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-amber-500/40 transition-all active:scale-95 cursor-pointer shadow-sm"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400 font-cairo">{isEn ? 'Copied!' : 'تم النسخ!'}</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5 text-sky-400" />
-                <span className="font-cairo">{isEn ? 'Copy' : 'نسخ'}</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        <span className="text-[11px] text-slate-500 font-mono tracking-wider">
-          ✝ Jesus Prayer
-        </span>
+        {/* FAR RIGHT (أقصى اليمين): زر مشاركة الصلاة كصورة */}
+        <button
+          type="button"
+          onClick={onShareImage}
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-amber-300 bg-slate-900/70 hover:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-800 hover:border-amber-500/40 transition-all active:scale-95 cursor-pointer shadow-sm select-none"
+          title={isEn ? 'Share as Image' : 'مشاركة الصلاة كصورة'}
+        >
+          <Palette className="w-3.5 h-3.5 text-amber-400" />
+          <span className="font-cairo">{isEn ? 'Share Image' : 'مشاركة كصورة'}</span>
+        </button>
       </div>
     </div>
   );
