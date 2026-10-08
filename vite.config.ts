@@ -14,11 +14,11 @@ export default defineConfig(() => {
         includeAssets: ['favicon.ico', 'icon.svg', 'apple-touch-icon.png'],
         manifest: {
           id: '/',
-          name: 'PrayerApp - مواقيت الصلاة',
-          short_name: 'مواقيت الصلاة',
-          description: 'تطبيق أندرويد متكامل لمواقيت الصلاة والقبلة والأذكار وتصدير APK',
-          theme_color: '#020617',
-          background_color: '#020617',
+          name: 'صلاة يسوع والصلوات السهمية - Jesus Prayer',
+          short_name: 'صلاة يسوع',
+          description: 'تطبيق مسيحي تفاعلي لصلاة يسوع والصلوات السهمية والخلوة الروحية والطلبات الشخصية',
+          theme_color: '#080D1A',
+          background_color: '#080D1A',
           display: 'standalone',
           orientation: 'portrait',
           start_url: '/',
@@ -45,8 +45,7 @@ export default defineConfig(() => {
           ]
         },
         devOptions: {
-          enabled: true,
-          type: 'module'
+          enabled: false
         }
       })
     ],
