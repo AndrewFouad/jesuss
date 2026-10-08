@@ -3,6 +3,8 @@
 
 class SpiritualHapticAudio {
   private ctx: AudioContext | null = null;
+  private alarmIntervalId: number | null = null;
+  private isAlarmActive: boolean = false;
 
   private getAudioContext(): AudioContext | null {
     try {
@@ -124,6 +126,131 @@ class SpiritualHapticAudio {
     } catch {
       // Safe fallback
     }
+  }
+
+  /**
+   * Plays a single authentic mobile alarm ringtone burst:
+   * Repeating 4-beep rhythmic alarm pattern (like mobile phone clock alarm)
+   */
+  private playAlarmBurst() {
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      // Vibrate mobile device in sync with alarm burst
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function') {
+        try {
+          navigator.vibrate([80, 50, 80, 50, 80, 50, 140]);
+        } catch {}
+      }
+
+      const now = ctx.currentTime;
+      
+      // 4-pulse phone alarm motif: Beep - Beep - Beep - BEEP!
+      const beeps = [
+        { time: 0.00, freq: 932.33, dur: 0.07 }, // A#5
+        { time: 0.12, freq: 932.33, dur: 0.07 }, // A#5
+        { time: 0.24, freq: 932.33, dur: 0.07 }, // A#5
+        { time: 0.36, freq: 1244.51, dur: 0.16 } // D#6 high resolving tone
+      ];
+
+      beeps.forEach(({ time, freq, dur }) => {
+        try {
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          const tStart = now + time;
+          const tEnd = tStart + dur;
+
+          // Dual tone: crisp square + full sine for clear phone speaker projection
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(freq, tStart);
+
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(freq * 2, tStart); // 1 octave overtone
+
+          // Sharp alarm envelope
+          gain.gain.setValueAtTime(0.001, tStart);
+          gain.gain.linearRampToValueAtTime(0.22, tStart + 0.01);
+          gain.gain.setValueAtTime(0.20, tEnd - 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.001, tEnd);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc1.start(tStart);
+          osc2.start(tStart);
+          osc1.stop(tEnd);
+          osc2.stop(tEnd);
+        } catch {}
+      });
+    } catch {
+      // Safe fallback
+    }
+  }
+
+  /**
+   * Starts repeating phone alarm ringtone until explicitly stopped
+   */
+  public startPhoneAlarm() {
+    this.stopPhoneAlarm(); // clear any prior state
+    this.isAlarmActive = true;
+
+    // Wake up audio context
+    const ctx = this.getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    // Play initial burst immediately
+    this.playAlarmBurst();
+
+    // Repeat every 950ms (classic mobile alarm cadence)
+    if (typeof window !== 'undefined') {
+      this.alarmIntervalId = window.setInterval(() => {
+        if (!this.isAlarmActive) {
+          this.stopPhoneAlarm();
+          return;
+        }
+        this.playAlarmBurst();
+      }, 950);
+    }
+  }
+
+  /**
+   * Stops the active phone alarm and cancels vibration
+   */
+  public stopPhoneAlarm() {
+    this.isAlarmActive = false;
+    if (this.alarmIntervalId !== null && typeof window !== 'undefined') {
+      window.clearInterval(this.alarmIntervalId);
+      this.alarmIntervalId = null;
+    }
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function') {
+      try {
+        navigator.vibrate(0);
+      } catch {}
+    }
+  }
+
+  public isPhoneAlarmRunning(): boolean {
+    return this.isAlarmActive;
+  }
+
+  /**
+   * Plays a 2.5-second preview of the phone alarm so the user can test the sound
+   */
+  public playAlarmPreview(onDone?: () => void) {
+    this.startPhoneAlarm();
+    setTimeout(() => {
+      this.stopPhoneAlarm();
+      if (onDone) onDone();
+    }, 2800);
   }
 }
 

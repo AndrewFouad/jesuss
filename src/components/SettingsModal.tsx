@@ -2,21 +2,11 @@ import React, { useState } from 'react';
 import { 
   X, 
   Trash2, 
-  Clock, 
-  Bell, 
-  Moon, 
-  Sun, 
-  Vibrate, 
   Globe, 
-  Sparkles, 
-  Check, 
-  Plus,
   Timer
 } from 'lucide-react';
 import { 
   AppSettings, 
-  FontSizeOption, 
-  FontFamilyOption, 
   PrayerItem 
 } from '../types/christianPrayer';
 import { spiritualHaptics } from '../utils/haptics';
@@ -48,6 +38,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [customMinutes, setCustomMinutes] = useState('15');
   const [showCustomTimerInput, setShowCustomTimerInput] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
+  const [isTestingAlarm, setIsTestingAlarm] = useState(false);
 
   if (!isOpen) return null;
 
@@ -72,16 +63,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     e.preventDefault();
     const mins = parseInt(customMinutes, 10);
     if (!isNaN(mins) && mins > 0) {
+      onUpdateSettings({ quietTimeMinutes: mins });
       onStartQuietTimer(mins);
       setShowCustomTimerInput(false);
-      showToast(isEn ? `Quiet time started: ${mins} minutes` : `تم بدء الخلوة: ${mins} دقيقة`);
+      showToast(isEn ? `Quiet time set & started: ${mins} minutes` : `تم ضبط وبدء الخلوة: ${mins} دقيقة`);
       spiritualHaptics.triggerPrayerSwitchFeedback(settings.hapticFeedback);
     }
   };
 
+  const handleSaveCustomDuration = () => {
+    const mins = parseInt(customMinutes, 10);
+    if (!isNaN(mins) && mins > 0) {
+      onUpdateSettings({ quietTimeMinutes: mins });
+      setShowCustomTimerInput(false);
+      showToast(isEn ? `Quiet time duration set to ${mins} minutes` : `تم حفظ مدة الخلوة: ${mins} دقيقة`);
+      spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
+    }
+  };
+
   const handleQuickTimer = (mins: number) => {
+    onUpdateSettings({ quietTimeMinutes: mins });
     onStartQuietTimer(mins);
-    showToast(isEn ? `Quiet time started: ${mins} minutes` : `تم بدء الخلوة: ${mins} دقائق`);
+    showToast(isEn ? `Quiet time set & started: ${mins} minutes` : `تم ضبط وبدء الخلوة: ${mins} دقائق`);
     spiritualHaptics.triggerPrayerSwitchFeedback(settings.hapticFeedback);
   };
 
@@ -125,22 +128,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Scrollable Body in exact specified order */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
           
-          {/* 1. Counter Disable / Focus Mode Toggle */}
-          <button 
-            type="button"
+          {/* 
+            1. Counter Disable Toggle:
+            Requirement: "خلى اسم زرار الغاء العداد إلغاء واحذف كلة نظام التركيز الى جنبها"
+          */}
+          <div 
             onClick={() => {
               const next = !settings.focusMode;
               onUpdateSettings({ focusMode: next });
               spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
               showToast(next 
-                ? (isEn ? 'Focus Mode active: Counter hidden' : 'تم تفعيل نظام التركيز وإخفاء العداد') 
-                : (isEn ? 'Focus Mode disabled: Counter visible' : 'تم إيقاف نظام التركيز وعودة العداد'));
+                ? (isEn ? 'Counter hidden' : 'تم إلغاء العداد') 
+                : (isEn ? 'Counter visible' : 'تم تفعيل العداد'));
             }}
             className="w-full bg-[#0E172A] border border-slate-800 hover:border-slate-700 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] select-none text-right"
+            dir="ltr"
           >
-            {/* Toggle switch on left (in RTL) */}
+            {/* Toggle switch on left */}
             <div
-              className={`w-12 h-7 p-1 rounded-full transition-colors flex items-center ${
+              className={`w-12 h-6.5 p-0.5 rounded-full transition-colors flex items-center shadow-inner ${
                 settings.focusMode ? 'bg-[#F59E0B] justify-end' : 'bg-slate-700 justify-start'
               }`}
             >
@@ -150,15 +156,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Label on right */}
             <div className="text-right">
               <span className="text-sm font-semibold text-slate-200 block">
-                {isEn ? 'Disable Counter / Focus Mode' : 'إلغاء العداد / نظام التركيز'}
+                {isEn ? 'Disable Counter' : 'إلغاء العداد'}
               </span>
               <span className="text-[11px] text-slate-400 block mt-0.5">
                 {settings.focusMode 
-                  ? (isEn ? 'Counter hidden • Next Prayer active' : 'العداد مخفي • زر الصلاة التالية مفعل') 
+                  ? (isEn ? 'Counter hidden • Next Prayer button active' : 'العداد مخفي • زر الصلاة التالية مفعل') 
                   : (isEn ? 'Counter and reset button visible' : 'العداد وزر التصفير ظاهران')}
               </span>
             </div>
-          </button>
+          </div>
 
           {/* 2. Add Personal Prayers */}
           <div className="bg-[#0E172A] border border-slate-800 rounded-2xl p-4 space-y-3">
@@ -347,8 +353,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {isEn ? 'Stop Timer ✕' : 'إلغاء المؤقت ✕'}
                 </button>
               ) : (
-                <span className="text-[11px] text-slate-400">
-                  {isEn ? 'Quick-set minutes' : 'دقائق سريعة'}
+                <span className="text-[11px] text-amber-400 font-semibold">
+                  {isEn ? `Configured: ${settings.quietTimeMinutes || 15} min` : `المدة المحددة: ${settings.quietTimeMinutes || 15} دقيقة`}
                 </span>
               )}
 
@@ -361,17 +367,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Quick-set buttons: [20 د] [15 د] [10 د] [5 د] */}
             <div className="grid grid-cols-4 gap-2">
               {[20, 15, 10, 5].map((mins) => {
-                const isCurrentActive = settings.quietTimeActive && settings.quietTimeMinutes === mins;
+                const isRunning = settings.quietTimeActive && settings.quietTimeMinutes === mins;
+                const isConfigured = (settings.quietTimeMinutes || 15) === mins;
                 return (
                   <button
                     key={mins}
                     type="button"
                     onClick={() => handleQuickTimer(mins)}
                     className={`py-2 rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer ${
-                      isCurrentActive
-                        ? 'bg-[#F59E0B] text-slate-950 shadow-md font-bold'
+                      isRunning
+                        ? 'bg-[#F59E0B] text-slate-950 shadow-md font-bold ring-2 ring-amber-400'
+                        : isConfigured
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/60 font-bold'
                         : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
                     }`}
+                    title={isEn ? `Set & start ${mins} min timer` : `تحديد وبدء ${mins} دقائق`}
                   >
                     {mins} {isEn ? 'm' : 'د'}
                   </button>
@@ -385,130 +395,210 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCustomTimerInput(true)}
-                  className="w-full py-2.5 px-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-[#F59E0B] hover:border-amber-500/50 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  className="w-full py-2 px-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 hover:text-[#F59E0B] hover:border-amber-500/50 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Timer className="w-4 h-4 text-amber-400" />
-                  <span className="font-bold">{isEn ? 'Set Custom Duration' : 'تحديد وقت خاص'}</span>
+                  <Timer className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="font-semibold">{isEn ? 'Set Custom Duration' : 'تحديد وقت خاص'}</span>
                 </button>
               ) : (
-                <form onSubmit={handleCustomTimerSubmit} className="flex items-center gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                  <input
-                    type="number"
-                    min="1"
-                    max="180"
-                    value={customMinutes}
-                    onChange={(e) => setCustomMinutes(e.target.value)}
-                    className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-center text-white"
-                  />
-                  <span className="text-xs text-slate-400">{isEn ? 'min' : 'دقيقة'}</span>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 bg-[#F59E0B] text-slate-950 font-bold rounded-lg text-xs cursor-pointer shadow"
-                  >
-                    {isEn ? 'Start' : 'بدء الخلوة'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomTimerInput(false)}
-                    className="px-2 py-1.5 text-xs text-slate-400 hover:text-white cursor-pointer"
-                  >
-                    {isEn ? 'Cancel' : 'إلغاء'}
-                  </button>
+                <form onSubmit={handleCustomTimerSubmit} className="flex flex-wrap items-center gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      max="180"
+                      value={customMinutes}
+                      onChange={(e) => setCustomMinutes(e.target.value)}
+                      className="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-center text-white"
+                    />
+                    <span className="text-xs text-slate-400">{isEn ? 'min' : 'دقيقة'}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 mr-auto">
+                    <button
+                      type="button"
+                      onClick={handleSaveCustomDuration}
+                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold cursor-pointer"
+                    >
+                      {isEn ? 'Save' : 'حفظ المدة'}
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 bg-[#F59E0B] text-slate-950 font-bold rounded-lg text-xs cursor-pointer shadow"
+                    >
+                      {isEn ? 'Start' : 'بدء الخلوة'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomTimerInput(false)}
+                      className="px-2 py-1.5 text-xs text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      {isEn ? 'Cancel' : 'إلغاء'}
+                    </button>
+                  </div>
                 </form>
               )}
             </div>
           </div>
 
-          {/* 6. Daily Quiet Time Reminder ⏰ */}
-          <div className="bg-[#0E172A] border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <input
-                type="time"
-                value={settings.dailyReminderTime}
-                onChange={(e) => onUpdateSettings({ dailyReminderTime: e.target.value })}
-                className="bg-slate-950 border border-slate-800 text-xs text-slate-200 px-2.5 py-1.5 rounded-xl focus:outline-none focus:border-[#F59E0B]"
-              />
+          {/* 
+            6. Daily Quiet Time Reminder:
+            Requirement:
+            - Left: Time input + Toggle switch
+            - Right: Text "التذكير اليومي بالخلوة ⏰"
+            - Plays mobile alarm sound + Test alarm button
+          */}
+          <div className="bg-[#0E172A] border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div 
+              className="flex items-center justify-between"
+              dir="ltr"
+            >
+              {/* LEFT (الشمال): الوقت وزرار التوجيل سويتش */}
+              <div className="flex items-center gap-3">
+                {/* Time Picker */}
+                <input
+                  type="time"
+                  value={settings.dailyReminderTime}
+                  onChange={(e) => onUpdateSettings({ dailyReminderTime: e.target.value })}
+                  className="bg-slate-950 border border-slate-800 text-xs text-slate-200 px-2.5 py-1.5 rounded-xl focus:outline-none focus:border-[#F59E0B]"
+                  title={isEn ? 'Reminder Time' : 'وقت التذكير'}
+                />
 
+                {/* Toggle Switch */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.dailyReminderEnabled}
+                  onClick={() => {
+                    const nextState = !settings.dailyReminderEnabled;
+                    onUpdateSettings({ dailyReminderEnabled: nextState });
+                    spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
+                    if (nextState && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+                      Notification.requestPermission().catch(() => {});
+                    }
+                    showToast(nextState 
+                      ? (isEn ? 'Reminder enabled • Alarm active' : 'تم تفعيل التذكير • المنبه جاهز') 
+                      : (isEn ? 'Reminder disabled' : 'تم تعطيل التذكير'));
+                  }}
+                  className={`w-12 h-6.5 p-0.5 rounded-full transition-colors flex items-center cursor-pointer shadow-inner ${
+                    settings.dailyReminderEnabled ? 'bg-emerald-500 justify-end' : 'bg-slate-700 justify-start'
+                  }`}
+                  title={isEn ? 'Daily Reminder Toggle' : 'تفعيل التذكير اليومي'}
+                >
+                  <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all" />
+                </button>
+              </div>
+
+              {/* RIGHT (اليمين): جملة (التذكير اليومي بالخلوة) */}
+              <div className="text-right flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-slate-200">
+                  {isEn ? 'Daily Quiet Time Reminder' : 'التذكير اليومي بالخلوة'}
+                </span>
+                <span>⏰</span>
+              </div>
+            </div>
+
+            {/* Test Mobile Alarm Sound Row */}
+            <div className="pt-2 border-t border-slate-800/70 flex items-center justify-between text-xs" dir="ltr">
               <button
                 type="button"
                 onClick={() => {
-                  const nextState = !settings.dailyReminderEnabled;
-                  onUpdateSettings({ dailyReminderEnabled: nextState });
-                  spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
-                  showToast(nextState ? (isEn ? 'Reminder enabled' : 'تم تفعيل التذكير اليومي') : (isEn ? 'Reminder disabled' : 'تم تعطيل التذكير'));
+                  if (isTestingAlarm) {
+                    spiritualHaptics.stopPhoneAlarm();
+                    setIsTestingAlarm(false);
+                  } else {
+                    setIsTestingAlarm(true);
+                    spiritualHaptics.playAlarmPreview(() => setIsTestingAlarm(false));
+                  }
                 }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                  settings.dailyReminderEnabled
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isTestingAlarm 
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse' 
+                    : 'bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30'
                 }`}
               >
-                {settings.dailyReminderEnabled 
-                  ? (isEn ? 'Enabled ✅' : 'مفعل ✅') 
-                  : (isEn ? 'Disabled ✕' : 'معطل ✕')}
+                <span>{isTestingAlarm ? '⏹️' : '🔔'}</span>
+                <span>{isTestingAlarm ? (isEn ? 'Stop Sound' : 'إيقاف النغمة') : (isEn ? 'Test Alarm Ring' : 'تجربة نغمة المنبه 🔔')}</span>
               </button>
-            </div>
 
-            <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-              <span>{isEn ? 'Daily Quiet Time Reminder' : 'التذكير اليومي بالخلوة'}</span>
-              <span>⏰</span>
-            </span>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {isEn ? 'Phone alarm sound 📱' : 'نغمة منبه الموبايل 📱'}
+              </span>
+            </div>
           </div>
 
-          {/* 7. Appearance & Haptics */}
-          <div className="bg-[#0E172A] border border-slate-800 rounded-2xl p-4 space-y-3.5">
+          {/* 
+            7. Appearance & Haptics:
+            Requirement: "وبرضة زرار الوضع اليلى والاهتزاز عند اللمس يبقى توجيل سوتش"
+          */}
+          <div className="bg-[#0E172A] border border-slate-800 rounded-2xl p-4 space-y-4">
             <span className="text-xs font-semibold text-slate-400 block text-right">
               {isEn ? 'Appearance & Haptics' : 'المظهر والاهتزاز'}
             </span>
 
-            {/* Dark Mode Row */}
-            <button 
-              type="button"
-              onClick={() => {
-                const next = !settings.darkMode;
-                onUpdateSettings({ darkMode: next });
-                spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
-              }}
-              className="w-full flex items-center justify-between pt-1 cursor-pointer select-none text-right"
+            {/* Dark Mode Row: Toggle switch on left, label on right */}
+            <div 
+              className="w-full flex items-center justify-between pt-0.5 select-none"
+              dir="ltr"
             >
-              <div className="flex items-center gap-2">
-                <span className={`px-2.5 py-1 rounded-xl text-xs font-semibold ${
-                  settings.darkMode ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-800 text-slate-300'
-                }`}>
-                  {settings.darkMode ? (isEn ? 'Dark' : 'داكن') : (isEn ? 'Light' : 'فاتح')}
-                </span>
-                <span className="text-lg">{settings.darkMode ? '🌙' : '☀️'}</span>
-              </div>
-
-              <span className="text-xs text-slate-200 font-medium">
-                {isEn ? 'Color Theme' : 'الوضع الليلي (Dark Mode)'}
-              </span>
-            </button>
-
-            {/* Haptics Row */}
-            <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80">
+              {/* Left: Toggle Switch */}
               <button
                 type="button"
+                role="switch"
+                aria-checked={settings.darkMode}
+                onClick={() => {
+                  const next = !settings.darkMode;
+                  onUpdateSettings({ darkMode: next });
+                  spiritualHaptics.triggerCountFeedback(settings.hapticFeedback);
+                }}
+                className={`w-12 h-6.5 p-0.5 rounded-full transition-colors flex items-center cursor-pointer shadow-inner ${
+                  settings.darkMode ? 'bg-[#F59E0B] justify-end' : 'bg-slate-700 justify-start'
+                }`}
+                title={isEn ? 'Toggle Dark Mode' : 'الوضع الليلي'}
+              >
+                <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all" />
+              </button>
+
+              {/* Right: Label + Icon */}
+              <div className="flex items-center gap-2 text-right">
+                <span className="text-xs text-slate-200 font-semibold">
+                  {isEn ? 'Dark Mode' : 'الوضع الليلي'}
+                </span>
+                <span className="text-base">{settings.darkMode ? '🌙' : '☀️'}</span>
+              </div>
+            </div>
+
+            {/* Haptics Row: Toggle switch on left, label on right */}
+            <div 
+              className="w-full flex items-center justify-between pt-3 border-t border-slate-800/80 select-none"
+              dir="ltr"
+            >
+              {/* Left: Toggle Switch */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.hapticFeedback}
                 onClick={() => {
                   const next = !settings.hapticFeedback;
                   onUpdateSettings({ hapticFeedback: next });
                   spiritualHaptics.triggerCountFeedback(next);
                   showToast(next ? (isEn ? 'Haptics enabled' : 'تم تشغيل الاهتزاز') : (isEn ? 'Haptics disabled' : 'تم تعطيل الاهتزاز'));
                 }}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                  settings.hapticFeedback
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-slate-900 text-slate-400 border-slate-800'
+                className={`w-12 h-6.5 p-0.5 rounded-full transition-colors flex items-center cursor-pointer shadow-inner ${
+                  settings.hapticFeedback ? 'bg-emerald-500 justify-end' : 'bg-slate-700 justify-start'
                 }`}
+                title={isEn ? 'Toggle Haptic Feedback' : 'الاهتزاز عند اللمس'}
               >
-                {settings.hapticFeedback 
-                  ? (isEn ? 'Enabled ✅' : 'مفعل ✅') 
-                  : (isEn ? 'Disabled ✕' : 'معطل ✕')}
+                <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all" />
               </button>
 
-              <span className="text-xs text-slate-200 font-medium">
-                {isEn ? 'Haptic feedback on touch' : 'اهتزاز اللمس عند العد والتبديل'}
-              </span>
+              {/* Right: Label + Icon */}
+              <div className="flex items-center gap-2 text-right">
+                <span className="text-xs text-slate-200 font-semibold">
+                  {isEn ? 'Haptic feedback on touch' : 'الاهتزاز عند اللمس'}
+                </span>
+                <span className="text-base">📳</span>
+              </div>
             </div>
           </div>
 

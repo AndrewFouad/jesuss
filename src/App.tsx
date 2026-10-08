@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   focusMode: false,
   fontSize: 'medium',
   fontFamily: 'amiri',
-  quietTimeMinutes: 0,
+  quietTimeMinutes: 15,
   quietTimeActive: false,
   quietTimeRemainingSeconds: 0,
   dailyReminderEnabled: true,
@@ -108,10 +108,12 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
+  const [isAlarmModalOpen, setIsAlarmModalOpen] = useState(false);
 
   // Refs
   const timerRef = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const lastAlarmTriggerRef = useRef<string | null>(null);
 
   const isEn = settings.language === 'en';
 
@@ -175,6 +177,46 @@ export default function App() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [settings.quietTimeActive]);
+
+  // Monitor daily quiet time alarm and ring with mobile alarm ringtone
+  useEffect(() => {
+    if (!settings.dailyReminderEnabled || !settings.dailyReminderTime) {
+      return;
+    }
+
+    const checkAlarmTime = () => {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const currentTimeStr = `${hh}:${mm}`;
+
+      if (currentTimeStr === settings.dailyReminderTime) {
+        const triggerKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}_${currentTimeStr}`;
+        if (lastAlarmTriggerRef.current !== triggerKey) {
+          lastAlarmTriggerRef.current = triggerKey;
+
+          // Start the phone alarm ringtone!
+          spiritualHaptics.startPhoneAlarm();
+          setIsAlarmModalOpen(true);
+
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(isEn ? 'Jesus Prayer - Quiet Time' : 'صلاة يسوع - موعد الخلوة الروحية', {
+                body: isEn 
+                  ? 'It is time for your daily quiet time and prayer with the Lord Jesus.' 
+                  : 'حان الآن موعد خلوتك الروحية وصلاتك مع الرب يسوع المسيح.',
+                icon: '/icon-192.png'
+              });
+            } catch {}
+          }
+        }
+      }
+    };
+
+    checkAlarmTime();
+    const interval = window.setInterval(checkAlarmTime, 2000);
+    return () => window.clearInterval(interval);
+  }, [settings.dailyReminderEnabled, settings.dailyReminderTime, isEn]);
 
   // Close dropdown on click outside - use 'click' listener to avoid interfering with mobile touch
   useEffect(() => {
@@ -595,6 +637,60 @@ export default function App() {
         imageUrl={shareImageUrl}
         language={settings.language}
       />
+
+      {/* 4. Daily Quiet Time Phone Alarm Ringing Modal */}
+      {isAlarmModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in font-cairo"
+          dir={isEn ? 'ltr' : 'rtl'}
+        >
+          <div className="w-full max-w-sm rounded-[28px] bg-[#0E172A] border-2 border-amber-500/80 p-6 shadow-[0_0_60px_rgba(245,158,11,0.5)] text-center space-y-5 animate-in zoom-in-95">
+            {/* Pulsing Alarm Icon */}
+            <div className="w-20 h-20 mx-auto rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-4xl animate-bounce">
+              ⏰
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-extrabold text-[#F59E0B]">
+                {isEn ? 'Quiet Time Alarm Ringing' : 'منبه الخلوة الروحية يرن'}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed px-2">
+                {isEn 
+                  ? 'It is time for your spiritual quiet time and communion with the Lord Jesus.' 
+                  : 'حان الآن موعد خلوتك الروحية مع الرب يسوع المسيح.'}
+              </p>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  spiritualHaptics.stopPhoneAlarm();
+                  setIsAlarmModalOpen(false);
+                  const minutesToStart = (settings.quietTimeMinutes && settings.quietTimeMinutes > 0)
+                    ? settings.quietTimeMinutes
+                    : 15;
+                  handleStartQuietTimer(minutesToStart);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 font-bold text-xs sm:text-sm shadow-lg transition-transform active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>{isEn ? 'Start Quiet Time Now ⏳' : 'بدء الخلوة الآن ⏳'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  spiritualHaptics.stopPhoneAlarm();
+                  setIsAlarmModalOpen(false);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 font-semibold text-xs transition-colors cursor-pointer"
+              >
+                {isEn ? 'Stop Alarm 🔕' : 'إيقاف المنبه 🔕'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
