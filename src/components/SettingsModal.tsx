@@ -3,7 +3,9 @@ import {
   X, 
   Trash2, 
   Globe, 
-  Timer
+  Timer,
+  Smartphone,
+  Download
 } from 'lucide-react';
 import { 
   AppSettings, 
@@ -641,6 +643,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </span>
           </div>
 
+          {/* 9. Android Project & APK Download Section */}
+          <div className="bg-[#0E172A] border border-amber-500/30 rounded-2xl p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <Smartphone className="w-4 h-4 text-emerald-400" />
+                <span>{isEn ? 'Android App & APK Build' : 'تطبيق الأندرويد واستخراج ملف APK'}</span>
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                {isEn ? 'PWA Native Hybrid' : 'النسخة الأصلية الكاملة'}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed text-right">
+              {isEn 
+                ? 'Download the complete Android project bundle with all prayers, timers, audio and offline assets to generate your APK.' 
+                : 'تم ربط كامل ملفات التطبيق الحقيقية (الصلوات، مؤقت الخلوة، الأصوات، والاهتزاز) داخل مشروع أندرويد ليعمل 100% بدون إنترنت.'}
+            </p>
+
+            <a
+              href="/JesusPrayer-Android-Project.zip"
+              download="JesusPrayer-Android-Project.zip"
+              className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isEn ? 'Download Android Studio Project (.ZIP)' : 'تحميل مشروع الأندرويد الكامل (.ZIP) لبناء APK'}</span>
+            </a>
+
+            <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1 text-right">
+              <div className="text-amber-400 font-semibold mb-1">
+                {isEn ? '⚡ How to get APK in 1 minute:' : '⚡ كيف تستخرج APK في دقيقة:'}
+              </div>
+              <div>• {isEn ? '1. Upload zip to GitHub: Action builds the APK automatically.' : '١. ارفع ملفات الـ ZIP إلى مستودع GitHub وسيقوم ببناء الـ APK تلقائياً في دقيقة.'}</div>
+              <div>• {isEn ? '2. Or open the folder in Android Studio and click Build APK.' : '٢. أو افتح المجلد في Android Studio واضغط Build > Build APK.'}</div>
+              <div>• {isEn ? '3. Or install directly as PWA from your mobile browser without building.' : '٣. أو اضغط زر «تثبيت التطبيق» من المتصفح ليعمل فوراً كتطبيق كامل على هاتفك.'}</div>
+            </div>
+          </div>
         </div>
 
         {/* Footer Close button */}

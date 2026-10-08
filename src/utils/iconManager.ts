@@ -323,8 +323,8 @@ export async function generateUpdatedAndroidZip(
   // Helper to convert Blob to ArrayBuffer
   const blobToBuffer = async (b: Blob) => await b.arrayBuffer();
 
-  // Root or JesusPrayer folder
-  const appFolder = loaded.folder("JesusPrayer") || loaded.folder("PrayerApp");
+  // Root or JesusPrayerApp folder
+  const appFolder = loaded.folder("JesusPrayerApp") || loaded.folder("JesusPrayer") || loaded.folder("PrayerApp") || loaded;
   const appRes = appFolder?.folder("app")?.folder("src")?.folder("main")?.folder("res");
   if (appRes) {
     // Write density folders

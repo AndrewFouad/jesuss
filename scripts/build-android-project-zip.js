@@ -1,12 +1,25 @@
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import JSZip from 'jszip';
 
 async function createProjectZip() {
+  console.log('Ensuring latest web production build in dist/...');
+  try {
+    execSync('npx vite build', { stdio: 'inherit' });
+  } catch (err) {
+    console.warn('Warning: vite build had warnings or errors, proceeding with existing dist/ if available:', err);
+  }
+
+  const distDir = path.resolve('dist');
+  if (!fs.existsSync(distDir)) {
+    throw new Error('dist directory does not exist! Please run "npm run build" first.');
+  }
+
   const zip = new JSZip();
   const root = zip.folder("JesusPrayerApp");
 
-  // settings.gradle.kts
+  // 1. settings.gradle.kts
   root.file("settings.gradle.kts", `pluginManagement {
     repositories {
         google {
@@ -32,21 +45,21 @@ rootProject.name = "JesusPrayerApp"
 include(":app")
 `);
 
-  // build.gradle.kts (project level)
+  // 2. build.gradle.kts (root level)
   root.file("build.gradle.kts", `plugins {
     id("com.android.application") version "8.2.2" apply false
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false
 }
 `);
 
-  // gradle.properties
+  // 3. gradle.properties
   root.file("gradle.properties", `org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
 android.useAndroidX=true
 android.nonTransitiveRClass=true
 kotlin.code.style=official
 `);
 
-  // gradle-wrapper.properties
+  // 4. gradle wrapper
   const gradleWrapper = root.folder("gradle").folder("wrapper");
   gradleWrapper.file("gradle-wrapper.properties", `distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
@@ -55,7 +68,7 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 `);
 
-  // gradlew & gradlew.bat
+  // 5. gradlew & gradlew.bat
   root.file("gradlew", `#!/bin/sh
 APP_BASE_NAME=\`basename "$0"\`
 CLASSPATH="gradle/wrapper/gradle-wrapper.jar"
@@ -68,7 +81,7 @@ set CLASSPATH="gradle\\wrapper\\gradle-wrapper.jar"
 java -jar "%CLASSPATH%" %*
 `);
 
-  // GitHub Actions Workflow for automatic APK build in cloud
+  // 6. GitHub Actions Workflow for automatic cloud APK build
   const github = root.folder(".github").folder("workflows");
   github.file("build-apk.yml", `name: Build Android APK
 
@@ -79,6 +92,7 @@ on:
 
 jobs:
   build:
+    name: Build Debug APK
     runs-on: ubuntu-latest
 
     steps:
@@ -106,7 +120,7 @@ jobs:
         retention-days: 14
 `);
 
-  // app/build.gradle.kts
+  // 7. app/build.gradle.kts
   const app = root.folder("app");
   app.file("build.gradle.kts", `plugins {
     id("com.android.application")
@@ -121,8 +135,8 @@ android {
         applicationId = "com.example.jesusprayer"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0.0"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -147,37 +161,26 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
-    buildFeatures {
-        compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
 }
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.activity:activity-ktx:1.8.2")
+    implementation("androidx.webkit:webkit:1.10.0")
 }
 `);
 
   app.file("proguard-rules.pro", `-dontwarn java.awt.**`);
 
-  // AndroidManifest.xml
+  // 8. AndroidManifest.xml
   const srcMain = app.folder("src").folder("main");
   srcMain.file("AndroidManifest.xml", `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="true"
@@ -185,10 +188,13 @@ dependencies {
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:hardwareAccelerated="true"
         android:theme="@style/Theme.JesusPrayer">
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.JesusPrayer">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -200,318 +206,158 @@ dependencies {
 </manifest>
 `);
 
-  // MainActivity.kt (Christian Jesus Prayer & Arrow Prayers in Jetpack Compose)
+  // 9. MainActivity.kt (Native Android WebView wrapping the 100% full React PWA)
   const pkgFolder = srcMain.folder("java").folder("com").folder("example").folder("jesusprayer");
   pkgFolder.file("MainActivity.kt", `package com.example.jesusprayer
 
+import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import android.view.WindowManager
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AppCompatActivity
+import androidx.webkit.WebViewAssetLoader
 
-val CairoFont = FontFamily(Font(R.font.cairo_regular, FontWeight.Normal))
-val AmiriFont = FontFamily(Font(R.font.amiri_regular, FontWeight.Normal))
+/**
+ * MainActivity for Jesus Prayer Application.
+ * Packages the full React/Vite PWA locally into Android WebView using WebViewAssetLoader.
+ * Provides 100% offline capability, local ES Modules support, full audio & haptics,
+ * and seamless Arabic RTL layout matching the web app.
+ */
+class MainActivity : AppCompatActivity() {
 
-class MainActivity : ComponentActivity() {
+    private lateinit var webView: WebView
+
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MaterialTheme {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = Color(0xFF080D1A)
-                    ) {
-                        JesusPrayerScreen()
-                    }
-                }
+
+        // Status bar & Navigation bar dark colors (#080D1A) matching prayer app theme
+        window.statusBarColor = Color.parseColor("#080D1A")
+        window.navigationBarColor = Color.parseColor("#080D1A")
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+
+        webView = WebView(this)
+        setContentView(webView)
+
+        // Asset loader to securely serve dist assets from local APK assets folder
+        // Resolves CORS, ES modules (<script type="module">), and enables 100% offline usage.
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest
+            ): WebResourceResponse? {
+                return assetLoader.shouldInterceptRequest(request.url)
             }
         }
+
+        webView.webChromeClient = WebChromeClient()
+
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            mediaPlaybackRequiresUserGesture = false
+            cacheMode = WebSettings.LOAD_DEFAULT
+            allowFileAccess = false
+            allowContentAccess = false
+            displayZoomControls = false
+            builtInZoomControls = false
+            useWideViewPort = true
+            loadWithOverviewMode = true
+        }
+
+        webView.setBackgroundColor(Color.parseColor("#080D1A"))
+
+        // Handle Android hardware Back button
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
+
+        // Load the React PWA locally
+        webView.loadUrl("https://appassets.androidplatform.net/index.html")
     }
-}
 
-@Composable
-fun JesusPrayerScreen() {
-    val prayers = listOf(
-        "يا ربي يسوع المسيح ابن الله الحي صَيِّرني إنساناً جديداً",
-        "يا ربي يسوع المسيح، ارحمني أنا الخاطئ",
-        "يا ربي يسوع المسيح، أعني واحفظني في رضاك",
-        "يا يسوع الحبيب، نَقِّ قلبي وثبّت فكري فيك",
-        "الرب نوري وخلاصي ممن أخاف، الرب حصن حياتي ممن أرتعب",
-        "قلباً نقيّاً اخلق فيّ يا الله، وروحاً مستقيماً جدّد في أحشائي"
-    )
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+    }
 
-    var currentPrayerIndex by remember { mutableStateOf(0) }
-    var counter by remember { mutableStateOf(0) }
-    var isFavorite by remember { mutableStateOf(false) }
+    override fun onPause() {
+        webView.onPause()
+        super.onPause()
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        // 1. Top Bar
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                color = Color(0xFF0E172A),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.padding(2.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Favorite,
-                        contentDescription = "المحفوظات",
-                        tint = Color(0xFFF43F5E),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "المحفوظات",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontFamily = CairoFont
-                    )
-                }
-            }
-
-            Surface(
-                color = Color(0xFF0E172A),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.size(42.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "الإعدادات",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        // 2. Category Selector & Prayer Card
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Surface(
-                color = Color(0xFF0E172A),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "📖 الطلبات: الصلاة السهمية",
-                        fontFamily = CairoFont,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFF59E0B)
-                    )
-                    Text(text = "▼", color = Color(0xFF94A3B8), fontSize = 12.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0E172A)),
-                shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp).fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        IconButton(onClick = { isFavorite = !isFavorite }) {
-                            Icon(
-                                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = "Favorite",
-                                tint = if (isFavorite) Color(0xFFF43F5E) else Color(0xFF94A3B8)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = "\\"" + prayers[currentPrayerIndex] + "\\"",
-                        fontFamily = AmiriFont,
-                        fontSize = 24.sp,
-                        lineHeight = 40.sp,
-                        color = Color(0xFFF59E0B),
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Text(
-                        text = "🎨 مشاركة كصورة",
-                        fontFamily = CairoFont,
-                        fontSize = 12.sp,
-                        color = Color(0xFF94A3B8)
-                    )
-                }
-            }
-        }
-
-        // 3. Circular Rosary Counter & Navigation
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(bottom = 16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(170.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color(0xFFF59E0B), Color(0xFFD97706))
-                        )
-                    )
-                    .clickable { counter++ },
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = counter.toString(),
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF080D1A)
-                    )
-                    Text(
-                        text = "اضغط للعد",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF080D1A),
-                        fontFamily = CairoFont
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "تصفير العداد",
-                    color = Color(0xFF38BDF8),
-                    fontSize = 13.sp,
-                    fontFamily = CairoFont,
-                    modifier = Modifier.clickable { counter = 0 }
-                )
-
-                Surface(
-                    color = Color(0xFF16233B),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.clickable {
-                        currentPrayerIndex = (currentPrayerIndex + 1) % prayers.size
-                    }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "الصلاة التالية",
-                            tint = Color(0xFF38BDF8),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "الصلاة التالية",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = CairoFont
-                        )
-                    }
-                }
-            }
-        }
+    override fun onDestroy() {
+        webView.destroy()
+        super.onDestroy()
     }
 }
 `);
 
-  // Resources
+  // 10. Copy all files from dist/ into app/src/main/assets/
+  const assetsFolder = srcMain.folder("assets");
+  let assetCount = 0;
+
+  function copyDirRecursive(sourceDir, targetFolder) {
+    const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const srcPath = path.join(sourceDir, entry.name);
+      // Skip zip files and android zip backups inside dist
+      if (entry.name.endsWith('.zip')) {
+        continue;
+      }
+      if (entry.isDirectory()) {
+        const subFolder = targetFolder.folder(entry.name);
+        copyDirRecursive(srcPath, subFolder);
+      } else {
+        const fileContent = fs.readFileSync(srcPath);
+        targetFolder.file(entry.name, fileContent);
+        assetCount++;
+      }
+    }
+  }
+
+  copyDirRecursive(distDir, assetsFolder);
+  console.log(`Copied ${assetCount} web build assets from dist/ into app/src/main/assets/`);
+
+  // 11. Resources (Values, Styles, Icons)
   const res = srcMain.folder("res");
-
-  // Font files
-  const fontFolder = res.folder("font");
-  const cairoPath = path.resolve("android_template/res/font/cairo_regular.ttf");
-  const amiriPath = path.resolve("android_template/res/font/amiri_regular.ttf");
-
-  if (fs.existsSync(cairoPath)) {
-    fontFolder.file("cairo_regular.ttf", fs.readFileSync(cairoPath));
-  }
-  if (fs.existsSync(amiriPath)) {
-    fontFolder.file("amiri_regular.ttf", fs.readFileSync(amiriPath));
-  }
-
-  // Values
   const valuesFolder = res.folder("values");
   valuesFolder.file("strings.xml", `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">JesusPrayer</string>
+    <string name="app_name">صلاة يسوع</string>
 </resources>
 `);
 
   valuesFolder.file("themes.xml", `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.JesusPrayer" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.JesusPrayer" parent="Theme.AppCompat.NoActionBar">
         <item name="android:statusBarColor">#080D1A</item>
         <item name="android:navigationBarColor">#080D1A</item>
+        <item name="android:windowBackground">#080D1A</item>
     </style>
 </resources>
 `);
 
-  // Drawables
+  // Launcher drawables
   const drawable = res.folder("drawable");
   drawable.file("ic_launcher_background.xml", `<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -531,14 +377,14 @@ fun JesusPrayerScreen() {
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Golden Cross -->
+    <!-- Golden Christian Cross -->
     <path
         android:fillColor="#F59E0B"
-        android:pathData="M50,20h8v68h-8z M32,38h44v8h-44z" />
+        android:pathData="M50,18 h8 v72 h-8 z M28,38 h52 v8 h-52 z" />
 </vector>
 `);
 
-  // Mipmap
+  // Mipmaps
   const mipmap = res.folder("mipmap-anydpi-v26");
   mipmap.file("ic_launcher.xml", `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
@@ -553,6 +399,49 @@ fun JesusPrayerScreen() {
 </adaptive-icon>
 `);
 
+  // 12. README.md with clear building instructions
+  root.file("README.md", `# مشروع تطبيق صلاة يسوع للأندرويد (Jesus Prayer Android Project)
+
+هذا المشروع يحتوي على تطبيق صلاة يسوع والصلوات السهمية بكامل ميزاته (React + Vite + PWA) مدمجاً ومحزماً داخل مشروع أندرويد متكامل يعمل بدون إنترنت (100% Offline).
+
+---
+
+## 🚀 كيفية استخراج ملف الـ APK (3 طرق سهلة):
+
+### 1️⃣ الطريقة الأولى: البناء التلقائي عبر GitHub Actions (الأسهل بدون تثبيت أي برامج على جهازك)
+1. قم بفك ضغط هذا المجلد وارفعه على حسابك في GitHub في مستودع جديد (Repository).
+2. بمجرد رفع الملفات، ستعمل أداة GitHub Actions تلقائياً بفضل ملف \`.github/workflows/build-apk.yml\`.
+3. ادخل على تبويب **Actions** في صفحة المستودع.
+4. انتظر دقيقة واحدة حتى تكتمل العملية، ثم اضغط على البناء وحمّل ملف:
+   \`JesusPrayer-Debug-APK\`
+   وستجد داخله ملف \`app-debug.apk\` جاهزاً للتثبيت المباشر على أي هاتف أندرويد!
+
+---
+
+### 2️⃣ الطريقة الثانية: عبر Android Studio على الكمبيوتر
+1. افتح برنامج Android Studio.
+2. اختر **Open** ثم حدد مجلد \`JesusPrayerApp\`.
+3. انتظر ثوانٍ حتى يقوم البرنامج بعمل مزامنة Gradle (Sync).
+4. من القائمة العلوية اضغط على:
+   \`Build\` > \`Build Bundle(s) / APK(s)\` > \`Build APK(s)\`.
+5. سيظهر لك إشعار بالأسفل \`APK(s) generated successfully\`، اضغط على **locate** لتحصل على ملف الـ APK فوراً.
+
+---
+
+### 3️⃣ الطريقة الثالثة: عبر سطر الأوامر (Terminal / Command Prompt)
+- على نظام لينكس أو ماك:
+  \`\`\`bash
+  chmod +x gradlew
+  ./gradlew assembleDebug
+  \`\`\`
+- على نظام ويندوز:
+  \`\`\`cmd
+  gradlew.bat assembleDebug
+  \`\`\`
+ستجد ملف الـ APK في المسار:
+\`app/build/outputs/apk/debug/app-debug.apk\`
+`);
+
   const content = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
   
   const publicDir = path.resolve('public');
@@ -560,10 +449,20 @@ fun JesusPrayerScreen() {
     fs.mkdirSync(publicDir, { recursive: true });
   }
 
-  const outPath = path.join(publicDir, 'JesusPrayer-Android-Project.zip');
-  fs.writeFileSync(outPath, content);
-  fs.writeFileSync(path.join(publicDir, 'PrayerApp-Android-Project.zip'), content);
-  console.log('Project ZIP created successfully at:', outPath, 'Size:', (content.length / 1024 / 1024).toFixed(2), 'MB');
+  const outPath1 = path.join(publicDir, 'JesusPrayer-Android-Project.zip');
+  const outPath2 = path.join(publicDir, 'PrayerApp-Android-Project.zip');
+  fs.writeFileSync(outPath1, content);
+  fs.writeFileSync(outPath2, content);
+
+  // Also write to dist/ so it is immediately accessible
+  if (fs.existsSync(distDir)) {
+    fs.writeFileSync(path.join(distDir, 'JesusPrayer-Android-Project.zip'), content);
+    fs.writeFileSync(path.join(distDir, 'PrayerApp-Android-Project.zip'), content);
+  }
+
+  console.log('✅ Android Project ZIP successfully generated with real React app assets!');
+  console.log('Output 1:', outPath1, 'Size:', (content.length / 1024 / 1024).toFixed(2), 'MB');
+  console.log('Output 2:', outPath2, 'Size:', (content.length / 1024 / 1024).toFixed(2), 'MB');
 }
 
 createProjectZip().catch(err => {
